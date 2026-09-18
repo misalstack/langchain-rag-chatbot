@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LangChain RAG Chatbot — MiSal Stack Portfolio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+    --border: #30363d; --green: #3fb950; --blue: #58a6ff;
+    --purple: #bc8cff; --orange: #ffa657; --red: #f85149;
+    --text: #e6edf3; --muted: #8b949e; --white: #ffffff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo-badge {
+    background: linear-gradient(135deg, #e8192c, #ff4757);
+    color: white; font-size: 0.7rem; font-weight: 700;
+    padding: 4px 10px; border-radius: 4px; letter-spacing: 1px;
+  }
+  .header h1 { font-size: 1rem; font-weight: 600; color: var(--white); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+  .status-text { font-size: 0.75rem; color: var(--green); font-weight: 500; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* MAIN LAYOUT */
+  .main { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 57px); }
+
+  /* SIDEBAR */
+  .sidebar { background: var(--bg2); border-right: 1px solid var(--border); overflow-y: auto; }
+  .sidebar-section { padding: 20px; border-bottom: 1px solid var(--border); }
+  .sidebar-section h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px; }
+
+  /* Knowledge Base */
+  .kb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; margin-bottom: 8px; cursor: pointer;
+    transition: all 0.2s; position: relative;
+  }
+  .kb-item:hover { border-color: var(--blue); }
+  .kb-item.active { border-color: var(--blue); background: rgba(88,166,255,0.08); }
+  .kb-icon { font-size: 1.2rem; }
+  .kb-info h4 { font-size: 0.82rem; font-weight: 600; color: var(--white); }
+  .kb-info p { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+  .kb-badge {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-size: 0.62rem; padding: 2px 7px; border-radius: 10px;
+    background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3);
+  }
+
+  /* Pipeline Steps */
+  .pipeline { display: flex; flex-direction: column; gap: 6px; }
+  .step {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 6px; font-size: 0.8rem;
+    transition: all 0.3s; border: 1px solid transparent;
+  }
+  .step.idle { color: var(--muted); }
+  .step.running { color: var(--orange); background: rgba(255,166,87,0.08); border-color: rgba(255,166,87,0.3); animation: stepPulse 1s infinite; }
+  .step.done { color: var(--green); background: rgba(63,185,80,0.06); border-color: rgba(63,185,80,0.2); }
+  @keyframes stepPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .step-icon { font-size: 1rem; width: 20px; text-align: center; }
+  .step-time { margin-left: auto; font-size: 0.68rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px; text-align: center;
+  }
+  .metric-val { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; color: var(--blue); }
+  .metric-label { font-size: 0.65rem; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* CHAT AREA */
+  .chat-area { display: flex; flex-direction: column; }
+  .chat-topbar {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2);
+  }
+  .chat-topbar-left { display: flex; align-items: center; gap: 10px; }
+  .model-badge {
+    font-size: 0.72rem; padding: 3px 10px; border-radius: 4px;
+    background: rgba(188,140,255,0.12); color: var(--purple);
+    border: 1px solid rgba(188,140,255,0.3); font-family: 'JetBrains Mono', monospace;
+  }
+  .chat-title { font-size: 0.9rem; font-weight: 600; }
+  .chunk-counter {
+    font-size: 0.72rem; padding: 3px 10px; border-radius: 4px;
+    background: rgba(88,166,255,0.1); color: var(--blue);
+    border: 1px solid rgba(88,166,255,0.2);
+  }
+
+  /* Messages */
+  .messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .message { display: flex; gap: 12px; max-width: 85%; animation: msgIn 0.3s ease; }
+  @keyframes msgIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .message.user { align-self: flex-end; flex-direction: row-reverse; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 0.85rem;
+  }
+  .avatar.ai { background: linear-gradient(135deg, #58a6ff, #bc8cff); }
+  .avatar.user-av { background: linear-gradient(135deg, #e8192c, #ff6b7a); }
+  .bubble {
+    padding: 12px 16px; border-radius: 12px; font-size: 0.88rem; line-height: 1.65;
+  }
+  .bubble.ai { background: var(--bg3); border: 1px solid var(--border); border-top-left-radius: 4px; }
+  .bubble.user { background: linear-gradient(135deg, #e8192c22, #e8192c11); border: 1px solid rgba(232,25,44,0.3); border-top-right-radius: 4px; color: var(--white); }
+
+  /* Sources */
+  .sources { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .source-chip {
+    font-size: 0.68rem; padding: 3px 9px; border-radius: 10px;
+    background: rgba(63,185,80,0.1); color: var(--green);
+    border: 1px solid rgba(63,185,80,0.25); cursor: pointer;
+    transition: background 0.2s;
+  }
+  .source-chip:hover { background: rgba(63,185,80,0.2); }
+
+  /* Thinking */
+  .thinking { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; border-top-left-radius: 4px; }
+  .dot-loader span { display: inline-block; width: 6px; height: 6px; background: var(--blue); border-radius: 50%; animation: dotBounce 1.2s infinite; margin: 0 2px; }
+  .dot-loader span:nth-child(2) { animation-delay: 0.2s; }
+  .dot-loader span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotBounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+
+  /* Input */
+  .input-area {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .suggested-questions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sq-btn {
+    font-size: 0.72rem; padding: 5px 12px; border-radius: 16px;
+    border: 1px solid var(--border); background: var(--bg3); color: var(--muted);
+    cursor: pointer; transition: all 0.2s; font-family: 'Inter', sans-serif;
+  }
+  .sq-btn:hover { border-color: var(--blue); color: var(--blue); background: rgba(88,166,255,0.08); }
+  .input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .input-box {
+    flex: 1; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 0.88rem;
+    resize: none; outline: none; min-height: 46px; max-height: 120px;
+    transition: border-color 0.2s;
+  }
+  .input-box:focus { border-color: var(--blue); }
+  .send-btn {
+    background: linear-gradient(135deg, #e8192c, #ff4757);
+    color: white; border: none; border-radius: 8px;
+    padding: 12px 20px; cursor: pointer; font-size: 0.88rem; font-weight: 600;
+    transition: all 0.2s; white-space: nowrap;
+  }
+  .send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(232,25,44,0.4); }
+  .send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Welcome */
+  .welcome { text-align: center; padding: 60px 40px; }
+  .welcome-icon { font-size: 3rem; margin-bottom: 16px; }
+  .welcome h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; }
+  .welcome p { color: var(--muted); font-size: 0.88rem; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+  .tech-pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .tech-pill {
+    font-size: 0.72rem; padding: 4px 12px; border-radius: 12px;
+    border: 1px solid var(--border); color: var(--muted); background: var(--bg3);
+  }
+
+  /* RAG context panel */
+  .rag-context {
+    font-size: 0.75rem; color: var(--muted); margin-top: 8px; padding: 8px 12px;
+    background: rgba(88,166,255,0.05); border: 1px solid rgba(88,166,255,0.15);
+    border-radius: 6px; font-family: 'JetBrains Mono', monospace; line-height: 1.6;
+  }
+  .rag-context strong { color: var(--blue); }
+
+  @media (max-width: 768px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo-badge">MiSal Stack</div>
+    <h1>🔗 LangChain RAG Chatbot — Portfolio Demo</h1>
+  </div>
+  <div class="header-right">
+    <div class="status-dot"></div>
+    <span class="status-text">System Online</span>
+  </div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <!-- Knowledge Base -->
+    <div class="sidebar-section">
+      <h3>📚 Knowledge Base</h3>
+      <div class="kb-item active" onclick="selectKB(this, 'misal')">
+        <div class="kb-icon">🏢</div>
+        <div class="kb-info">
+          <h4>MiSal Stack Docs</h4>
+          <p>Services, process & portfolio</p>
+        </div>
+        <span class="kb-badge">Active</span>
+      </div>
+      <div class="kb-item" onclick="selectKB(this, 'tech')">
+        <div class="kb-icon">⚙️</div>
+        <div class="kb-info">
+          <h4>Tech Stack Guide</h4>
+          <p>React, Node, Python, AWS</p>
+        </div>
+      </div>
+      <div class="kb-item" onclick="selectKB(this, 'ai')">
+        <div class="kb-icon">🤖</div>
+        <div class="kb-info">
+          <h4>AI/ML Capabilities</h4>
+          <p>Models, APIs, integrations</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RAG Pipeline -->
+    <div class="sidebar-section">
+      <h3>⚡ RAG Pipeline</h3>
+      <div class="pipeline">
+        <div class="step idle" id="step-query">
+          <span class="step-icon">🔍</span> Query Analysis
+          <span class="step-time" id="t1">—</span>
+        </div>
+        <div class="step idle" id="step-embed">
+          <span class="step-icon">🧮</span> Embed Query
+          <span class="step-time" id="t2">—</span>
+        </div>
+        <div class="step idle" id="step-retrieve">
+          <span class="step-icon">📦</span> Vector Retrieval
+          <span class="step-time" id="t3">—</span>
+        </div>
+        <div class="step idle" id="step-rank">
+          <span class="step-icon">🏆</span> Re-rank Chunks
+          <span class="step-time" id="t4">—</span>
+        </div>
+        <div class="step idle" id="step-gen">
+          <span class="step-icon">✨</span> LLM Generation
+          <span class="step-time" id="t5">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Metrics -->
+    <div class="sidebar-section">
+      <h3>📊 Live Metrics</h3>
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-val" id="m-queries">0</div>
+          <div class="metric-label">Queries</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="m-chunks">0</div>
+          <div class="metric-label">Chunks Used</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="m-latency">—</div>
+          <div class="metric-label">Avg Latency</div>
+        </div>
+        <div class="metric">
+          <div class="metric-val" id="m-acc">—</div>
+          <div class="metric-label">Relevance</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Architecture Note -->
+    <div class="sidebar-section">
+      <h3>🏗️ Architecture</h3>
+      <div style="font-size:0.75rem; color:var(--muted); line-height:1.7;">
+        <div style="margin-bottom:6px;">📄 <strong style="color:var(--text)">Documents</strong> → chunked & embedded</div>
+        <div style="margin-bottom:6px;">🗄️ <strong style="color:var(--text)">FAISS</strong> vector store (in-memory)</div>
+        <div style="margin-bottom:6px;">🔗 <strong style="color:var(--text)">LangChain</strong> orchestration layer</div>
+        <div style="margin-bottom:6px;">🤖 <strong style="color:var(--text)">GPT-4 Turbo</strong> generation</div>
+        <div>📊 <strong style="color:var(--text)">ReAct</strong> agent reasoning loop</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT AREA -->
+  <div class="chat-area">
+    <div class="chat-topbar">
+      <div class="chat-topbar-left">
+        <span class="chat-title">RAG-Powered Assistant</span>
+        <span class="model-badge">gpt-4-turbo</span>
+      </div>
+      <div id="chunk-counter" class="chunk-counter" style="display:none;">0 chunks retrieved</div>
+    </div>
+
+    <div class="messages" id="messages">
+      <div class="welcome">
+        <div class="welcome-icon">🧠</div>
+        <h2>LangChain RAG Demo</h2>
+        <p>This demo simulates a production RAG pipeline — documents are chunked, embedded into a vector store, and retrieved semantically to ground LLM responses.</p>
+        <div class="tech-pills">
+          <span class="tech-pill">🔗 LangChain</span>
+          <span class="tech-pill">📦 FAISS Vector Store</span>
+          <span class="tech-pill">🤖 GPT-4 Turbo</span>
+          <span class="tech-pill">🔍 Semantic Search</span>
+          <span class="tech-pill">🏆 Re-ranking</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="suggested-questions" id="suggestions">
+        <button class="sq-btn" onclick="askQuestion(this)">What services does MiSal Stack offer?</button>
+        <button class="sq-btn" onclick="askQuestion(this)">How does your development process work?</button>
+        <button class="sq-btn" onclick="askQuestion(this)">What AI/ML capabilities do you have?</button>
+        <button class="sq-btn" onclick="askQuestion(this)">What is your tech stack?</button>
+        <button class="sq-btn" onclick="askQuestion(this)">How long does a project take?</button>
+      </div>
+      <div class="input-row">
+        <textarea class="input-box" id="userInput" placeholder="Ask anything about MiSal Stack..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+          oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── KNOWLEDGE BASE ───────────────────────────────
+const KB = {
+  misal: {
+    name: "MiSal Stack Docs",
+    chunks: [
+      { id: "svc-1", text: "MiSal Stack offers Full-Stack Web Development using React.js, Next.js, Node.js, and Python. We build blazing-fast, scalable SPAs and enterprise platforms.", score: 0.94 },
+      { id: "svc-2", text: "Mobile app development for iOS and Android using React Native and Flutter. We deliver cross-platform experiences that feel native.", score: 0.91 },
+      { id: "svc-3", text: "Backend & API development: robust REST and GraphQL APIs, microservices architecture, PostgreSQL, MongoDB, and Redis. Built to scale.", score: 0.89 },
+      { id: "svc-4", text: "UI/UX Design services: Figma-based prototyping, pixel-perfect implementation, micro-interactions, and design systems.", score: 0.87 },
+      { id: "svc-5", text: "Cloud & DevOps: AWS/GCP deployment, Docker containerization, Kubernetes orchestration, CI/CD pipelines with GitHub Actions.", score: 0.88 },
+      { id: "svc-6", text: "AI Integration: chatbots, RAG pipelines, recommendation engines, and ML model deployment using LangChain, vLLM, and HuggingFace.", score: 0.92 },
+      { id: "proc-1", text: "Our process: Discovery → Design → Develop → Deploy. Each phase is milestone-gated with client reviews and transparent progress updates.", score: 0.85 },
+      { id: "proc-2", text: "Average project timeline: small projects 2-4 weeks, medium 6-12 weeks, large enterprise 3-6 months. We use agile sprints.", score: 0.83 },
+      { id: "stats-1", text: "MiSal Stack has delivered 50+ projects, served 30+ happy clients, maintains a 5-star average rating, with 3+ years of experience.", score: 0.90 },
+      { id: "contact-1", text: "Contact MiSal Stack: Email misalstack@gmail.com, WhatsApp +92 370 2282868. Available Mon-Sat 10am-8pm PKT.", score: 0.86 },
+    ]
+  },
+  tech: {
+    name: "Tech Stack Guide",
+    chunks: [
+      { id: "fe-1", text: "Frontend: React.js 18 with TypeScript, Next.js 14 (App Router), Tailwind CSS, shadcn/ui. State management via Zustand and React Query.", score: 0.93 },
+      { id: "be-1", text: "Backend: Node.js with Express/Fastify, Python with FastAPI/Django. REST + GraphQL APIs. JWT + OAuth2 authentication.", score: 0.91 },
+      { id: "db-1", text: "Databases: PostgreSQL (primary), MongoDB (document store), Redis (caching & sessions), Prisma ORM.", score: 0.88 },
+      { id: "cloud-1", text: "Cloud: AWS (EC2, S3, RDS, Lambda, CloudFront), Docker + Kubernetes, GitHub Actions CI/CD, Terraform IaC.", score: 0.90 },
+    ]
+  },
+  ai: {
+    name: "AI/ML Capabilities",
+    chunks: [
+      { id: "ai-1", text: "LLM Integration: GPT-4, Claude 3, Gemini Pro via LangChain. RAG pipelines with FAISS and Pinecone vector stores.", score: 0.95 },
+      { id: "ai-2", text: "vLLM deployment for high-throughput LLM serving with PagedAttention. Supports open-source models like Llama 3, Mistral, Qwen.", score: 0.92 },
+      { id: "ai-3", text: "Computer Vision: SAM (Segment Anything), YOLO-based object detection, image classification with fine-tuned ViT models.", score: 0.89 },
+      { id: "ai-4", text: "Speech AI: OpenAI Whisper integration for transcription, real-time ASR, multilingual support across 99 languages.", score: 0.91 },
+      { id: "ai-5", text: "MLOps: MLflow for experiment tracking, model registry, and deployment. Supports model versioning and A/B testing in production.", score: 0.87 },
+    ]
+  }
+};
+
+let currentKB = 'misal';
+let queryCount = 0;
+let totalLatency = 0;
+let totalChunks = 0;
+
+function selectKB(el, kb) {
+  document.querySelectorAll('.kb-item').forEach(i => { i.classList.remove('active'); i.querySelector('.kb-badge') && (i.querySelector('.kb-badge').style.display='none'); });
+  el.classList.add('active');
+  currentKB = kb;
+  // Add active badge
+  if (!el.querySelector('.kb-badge')) {
+    const b = document.createElement('span'); b.className = 'kb-badge'; b.textContent = 'Active';
+    el.appendChild(b);
+  } else { el.querySelector('.kb-badge').style.display = ''; }
+}
+
+// ─── RESPONSES ────────────────────────────────────
+const responses = {
+  "what services does misal stack offer": {
+    answer: "Based on the retrieved documents, MiSal Stack offers **6 core services**:\n\n1. **Full-Stack Web Development** — React.js, Next.js, Node.js, Python. SPAs to enterprise platforms.\n2. **Mobile Apps** — iOS & Android with React Native and Flutter.\n3. **Backend & APIs** — REST/GraphQL, microservices, PostgreSQL, MongoDB.\n4. **UI/UX Design** — Figma prototyping, pixel-perfect implementation.\n5. **Cloud & DevOps** — AWS/GCP, Docker, Kubernetes, CI/CD.\n6. **AI Integration** — LangChain, vLLM, chatbots, RAG pipelines, ML deployment.\n\nAll services are delivered end-to-end with a structured Discovery → Design → Develop → Deploy process.",
+    chunks: ["svc-1","svc-2","svc-3","svc-4","svc-5","svc-6"],
+    sources: ["MiSal Stack Docs / Services", "MiSal Stack Docs / Process"]
+  },
+  "how does your development process work": {
+    answer: "The retrieved documentation describes a **4-phase agile process**:\n\n**01 Discovery** → Deep dive into goals, requirements, target audience, and competitive landscape.\n\n**02 Design** → Wireframes, Figma prototypes, and high-fidelity UI reviewed and approved before development.\n\n**03 Develop** → Agile sprints with transparent progress. You see the product grow in real time.\n\n**04 Deploy** → Rigorous testing, performance optimization, and seamless launch with post-deployment support.\n\nEach phase is milestone-gated with client review checkpoints.",
+    chunks: ["proc-1","proc-2"],
+    sources: ["MiSal Stack Docs / Process"]
+  },
+  "what ai/ml capabilities do you have": {
+    answer: "From the AI/ML knowledge base, MiSal Stack has capabilities across the full AI stack:\n\n🔗 **LLM & RAG** — GPT-4, Claude 3, Gemini via LangChain. FAISS and Pinecone vector stores for RAG.\n\n⚡ **Inference** — vLLM with PagedAttention for high-throughput serving of open-source models (Llama 3, Mistral, Qwen).\n\n👁️ **Computer Vision** — Meta SAM, YOLO-based detection, fine-tuned ViT classifiers.\n\n🎙️ **Speech AI** — OpenAI Whisper, real-time ASR, multilingual across 99 languages.\n\n📊 **MLOps** — MLflow experiment tracking, model registry, A/B testing in production.",
+    chunks: ["ai-1","ai-2","ai-3","ai-4","ai-5"],
+    sources: ["AI/ML Capabilities / LLM", "AI/ML Capabilities / Vision", "AI/ML Capabilities / MLOps"]
+  },
+  "what is your tech stack": {
+    answer: "The technology documentation shows MiSal Stack uses a modern, production-grade stack:\n\n**Frontend:** React 18, Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Zustand\n\n**Backend:** Node.js (Fastify/Express), Python (FastAPI/Django), JWT + OAuth2\n\n**Databases:** PostgreSQL, MongoDB, Redis, Prisma ORM\n\n**Cloud:** AWS (EC2, S3, RDS, Lambda, CloudFront), Docker, Kubernetes, GitHub Actions, Terraform",
+    chunks: ["fe-1","be-1","db-1","cloud-1"],
+    sources: ["Tech Stack Guide / Frontend", "Tech Stack Guide / Backend", "Tech Stack Guide / Cloud"]
+  },
+  "how long does a project take": {
+    answer: "Based on the retrieved project timeline data:\n\n📦 **Small projects** (landing pages, simple apps) → **2–4 weeks**\n\n📊 **Medium projects** (SaaS, dashboards, mobile apps) → **6–12 weeks**\n\n🏢 **Large enterprise** (complex platforms, multi-vendor systems) → **3–6 months**\n\nAll projects use **agile sprints** with milestone check-ins so you see real progress throughout. Timeline is confirmed during the Discovery phase.",
+    chunks: ["proc-2","proc-1"],
+    sources: ["MiSal Stack Docs / Process"]
+  }
+};
+
+function normalize(q) { return q.toLowerCase().replace(/[^a-z0-9\s\/]/g,'').trim(); }
+
+function getResponse(q) {
+  const n = normalize(q);
+  for (const [key, val] of Object.entries(responses)) {
+    if (n.includes(key.split(' ').slice(0,4).join(' ')) || key.includes(n.split(' ').slice(0,4).join(' '))) return val;
+  }
+  // Default fallback
+  return {
+    answer: `Great question! Based on a semantic search across the ${KB[currentKB].name} knowledge base, here's what I found:\n\n**MiSal Stack** is a full-stack software company offering web, mobile, backend, cloud, and AI development services. We have 50+ delivered projects, 30+ happy clients, and 5★ average rating.\n\nFor a more specific answer, try asking about our services, tech stack, process, timeline, or AI capabilities. You can also reach us at **misalstack@gmail.com** or **+92 370 2282868**.`,
+    chunks: KB[currentKB].chunks.slice(0,3).map(c=>c.id),
+    sources: [KB[currentKB].name + " / General"]
+  };
+}
+
+// ─── PIPELINE ANIMATION ───────────────────────────
+const steps = ['step-query','step-embed','step-retrieve','step-rank','step-gen'];
+const times = [42, 18, 67, 31, 210];
+
+function resetPipeline() {
+  steps.forEach((s,i) => {
+    const el = document.getElementById(s);
+    el.className = 'step idle';
+    document.getElementById('t'+(i+1)).textContent = '—';
+  });
+}
+
+async function runPipeline() {
+  resetPipeline();
+  for (let i = 0; i < steps.length; i++) {
+    const el = document.getElementById(steps[i]);
+    el.className = 'step running';
+    await new Promise(r => setTimeout(r, times[i] + Math.random()*30));
+    el.className = 'step done';
+    document.getElementById('t'+(i+1)).textContent = (times[i]+Math.floor(Math.random()*20))+'ms';
+  }
+}
+
+// ─── SEND MESSAGE ─────────────────────────────────
+async function sendMessage(text) {
+  const input = document.getElementById('userInput');
+  const q = text || input.value.trim();
+  if (!q) return;
+
+  input.value = ''; input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('suggestions').style.display = 'none';
+
+  const start = Date.now();
+
+  // Add user message
+  addMessage('user', q);
+
+  // Show thinking
+  const thinkId = 'think-' + Date.now();
+  addThinking(thinkId);
+
+  // Run pipeline concurrently
+  runPipeline();
+
+  const resp = getResponse(q);
+  const delay = 800 + Math.random() * 600;
+  await new Promise(r => setTimeout(r, delay));
+
+  // Remove thinking
+  document.getElementById(thinkId)?.remove();
+
+  const latency = Date.now() - start;
+  totalLatency += latency;
+  queryCount++;
+  totalChunks += resp.chunks.length;
+
+  // Update metrics
+  document.getElementById('m-queries').textContent = queryCount;
+  document.getElementById('m-chunks').textContent = totalChunks;
+  document.getElementById('m-latency').textContent = Math.round(totalLatency/queryCount)+'ms';
+  document.getElementById('m-acc').textContent = '96%';
+
+  // Chunk counter
+  const cc = document.getElementById('chunk-counter');
+  cc.style.display = '';
+  cc.textContent = resp.chunks.length + ' chunks retrieved';
+
+  // Format answer
+  const formatted = resp.answer
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+
+  // Add AI message with sources
+  addAIMessage(formatted, resp.sources, resp.chunks);
+
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function addMessage(role, text) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  div.innerHTML = `
+    <div class="avatar ${role==='user'?'user-av':'ai'}">${role==='user'?'U':'🤖'}</div>
+    <div class="bubble ${role==='user'?'user':'ai'}">${text}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addThinking(id) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message'; div.id = id;
+  div.innerHTML = `
+    <div class="avatar ai">🤖</div>
+    <div class="thinking">
+      <div class="dot-loader"><span></span><span></span><span></span></div>
+      <span style="font-size:0.78rem;color:var(--muted)">Searching knowledge base...</span>
+    </div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addAIMessage(html, sources, chunkIds) {
+  const msgs = document.getElementById('messages');
+  const div = document.createElement('div');
+  div.className = 'message';
+
+  const sourceChips = sources.map(s => `<span class="source-chip">📄 ${s}</span>`).join('');
+
+  // Get top chunks from current KB
+  const kbChunks = KB[currentKB].chunks.filter(c => chunkIds.includes(c.id)).slice(0,2);
+  const chunkPreview = kbChunks.length > 0 ?
+    `<div class="rag-context"><strong>🔍 Retrieved context (top chunk):</strong><br>"${kbChunks[0].text.substring(0,120)}..." <span style="color:var(--green)">score: ${kbChunks[0].score}</span></div>` : '';
+
+  div.innerHTML = `
+    <div class="avatar ai">🤖</div>
+    <div style="max-width:100%">
+      <div class="bubble ai">${html}</div>
+      ${chunkPreview}
+      <div class="sources">${sourceChips}</div>
+    </div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function askQuestion(btn) {
+  sendMessage(btn.textContent);
+}
+</script>
+</body>
+</html>
